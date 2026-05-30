@@ -82,6 +82,7 @@ class PlayerOutcome:
 
 
 class StationPlayer:
+    audio_extensions = {".mp3", ".ogg", ".wav", ".flac", ".aac", ".m4a", ".opus"}
     scramble_effects = {
         "horizontal_line": "lavfi=[geq='if(mod(floor(Y/4),2),p(X,Y+20*sin(2*PI*X/50)),p(X,Y))']",
         "diagonal_lines": "lavfi=[geq='p(X+10*sin(2*PI*Y/30),Y)']",
@@ -329,7 +330,8 @@ class StationPlayer:
                     self.show_web(conf, blocking=False)
                     return True
 
-                should_stream_live = media_type != "audio"
+                ext = os.path.splitext(file_path)[1].lower()
+                should_stream_live = media_type != "audio" and ext not in self.audio_extensions
                 if should_stream_live:
                     self.live_output.start(file_path, is_stream=is_stream)
                 else:
