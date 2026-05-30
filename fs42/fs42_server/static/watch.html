@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FieldStation42 Live Watch</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #111; color: #eee; margin: 0; padding: 1rem; }
+        .wrap { max-width: 960px; margin: 0 auto; }
+        video { width: 100%; background: #000; border-radius: 8px; }
+        .status { margin-top: 0.75rem; font-size: 0.95rem; color: #ccc; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h2>FieldStation42 Live Watch</h2>
+        <video id="liveVideo" controls autoplay muted playsinline></video>
+        <div id="status" class="status">Waiting for playback…</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+    <script>
+        const video = document.getElementById("liveVideo");
+        const statusEl = document.getElementById("status");
+        let hls = null;
+        let sourceTag = null;
+        let lastSignature = null;
+
+        function loadLive() {
+            const src = `/live/index.m3u8?t=${Date.now()}`;
+
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+            if (sourceTag) {
+                sourceTag.remove();
+                sourceTag = null;
+            }
+
+            if (window.Hls && window.Hls.isSupported()) {
+                hls = new Hls({ liveSyncDurationCount: 2 });
+                hls.loadSource(src);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.ERROR, (_, data) => {
+                    if (data && data.fatal) statusEl.textContent = "Live stream is warming up…";
+                });
+            } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+                sourceTag = document.createElement("source");
+                sourceTag.src = src;
+                sourceTag.type = "application/vnd.apple.mpegurl";
+                video.appendChild(sourceTag);
+                video.load();
+            } else {
+                statusEl.textContent = "This browser does not support HLS playback.";
+            }
+        }
+
+        async function pollStatus() {
+            try {
+                const response = await fetch("/player/status");
+                const status = await response.json();
+                const signature = `${status.status || ""}|${status.channel_number || ""}|${status.file_path || ""}|${status.content_type || ""}`;
+
+                if (status.status === "playing" && status.content_type !== "web" && status.content_type !== "guide") {
+                    statusEl.textContent = `Playing: ${status.network_name || ""} ${status.title ? "— " + status.title : ""}`;
+                    if (signature !== lastSignature) {
+                        lastSignature = signature;
+                        loadLive();
+                    }
+                } else {
+                    statusEl.textContent = "No browser video stream for the current channel.";
+                    lastSignature = signature;
+                }
+            } catch (e) {
+                statusEl.textContent = "Unable to fetch player status.";
+            }
+        }
+
+        pollStatus();
+        setInterval(pollStatus, 1000);
+    </script>
+</body>
+</html>

@@ -117,7 +117,8 @@ class StationManager(object):
                     "schedule_agent",
                     "video_seek_timeout",
                     "overlay_conf",
-                    "start_channel"
+                    "start_channel",
+                    "live_stream_dir",
                 ]
 
                 for key in to_check:

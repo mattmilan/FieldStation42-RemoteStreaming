@@ -38,6 +38,7 @@ from fs42.liquid_manager import LiquidManager, PlayPoint, ScheduleNotFound, Sche
 from fs42.liquid_schedule import LiquidSchedule
 from fs42.station_manager import StationManager
 from fs42.slot_reader import SlotReader
+from fs42.live_output import LiveOutputStream
 
 logging.basicConfig(format="%(asctime)s %(levelname)s:%(name)s:%(message)s", level=logging.INFO)
 
@@ -189,6 +190,7 @@ class StationPlayer:
         self.now_playing_process = None
         self.schedule_lock = None
         self._active_afx = None
+        self.live_output = LiveOutputStream()
 
     def load_up(self):
         start_time = time.perf_counter()
@@ -235,6 +237,7 @@ class StationPlayer:
 
     def shutdown(self):
         self.current_playing_file_path = None
+        self.live_output.stop(clear_output=True)
         # Terminate any running web process
         if self.web_process and self.web_process.is_alive():
             self._l.info("Terminating web process")
@@ -326,6 +329,12 @@ class StationPlayer:
                     self.show_web(conf, blocking=False)
                     return True
 
+                should_stream_live = media_type != "audio"
+                if should_stream_live:
+                    self.live_output.start(file_path, is_stream=is_stream)
+                else:
+                    self.live_output.stop(clear_output=True)
+
                 if "panscan" in self.station_config:
                     self.mpv.panscan = self.station_config["panscan"]
                 else:
@@ -408,6 +417,7 @@ class StationPlayer:
     def play_and_wait(self, file_path):
         self._l.info(f"Play and wait on file {file_path}")
         self._close_now_playing()
+        self.live_output.start(file_path)
         self.mpv.vf = ""
         self.mpv.af = ""
         self.mpv.command("playlist-clear")
@@ -524,6 +534,7 @@ class StationPlayer:
         pass
 
     def show_guide(self, guide_config):
+        self.live_output.stop(clear_output=True)
         # create the pipe to communicate with the guide channel
         queue = multiprocessing.Queue()
         guide_process = multiprocessing.Process(
@@ -604,6 +615,7 @@ class StationPlayer:
 
 
     def show_web(self, web_config, blocking=True):
+        self.live_output.stop(clear_output=True)
         if not WEB_RENDER_AVAILABLE:
             self._l.error("Web rendering not available - PySide6 not installed")
             msg = "Web rendering requires PySide6 to be installed and configured. Please check documentation."

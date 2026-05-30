@@ -45,6 +45,10 @@ async def root():
 async def remote():
     return FileResponse("fs42/fs42_server/static/remote.html")
 
+@fapi.get("/watch")
+async def watch():
+    return FileResponse("fs42/fs42_server/static/watch.html")
+
 @fapi.get('/favicon.ico', include_in_schema=False)
 async def favicon():
     return FileResponse("fs42/fs42_server/static/favicon.ico")
@@ -68,10 +72,13 @@ def run_with_shutdown_queue(shutdown_queue, command_queue):
     _shutdown_queue = shutdown_queue
     fapi.state.player_command_queue = command_queue
 
+    conf = StationManager().server_conf
+    live_dir = conf.get("live_stream_dir", "runtime/live")
     fapi.mount("/static", StaticFiles(directory="fs42/fs42_server/static", html="true"), name="static")
     os.makedirs("runtime/guide_videos", exist_ok=True)
     fapi.mount("/guide_videos", StaticFiles(directory="runtime/guide_videos"), name="guide_videos")
-    conf = StationManager().server_conf
+    os.makedirs(live_dir, exist_ok=True)
+    fapi.mount("/live", StaticFiles(directory=live_dir), name="live")
     uvicorn.run(fapi, host=conf["server_host"], port=conf["server_port"])
 
 
@@ -85,10 +92,13 @@ def mount_fs42_api():
     logging.getLogger("uvicorn.access").addFilter(PlayerStatusFilter())
     
     fapi.state.player_command_queue = None
+    conf = StationManager().server_conf
+    live_dir = conf.get("live_stream_dir", "runtime/live")
     fapi.mount("/static", StaticFiles(directory="fs42/fs42_server/static", html="true"), name="static")
     os.makedirs("runtime/guide_videos", exist_ok=True)
     fapi.mount("/guide_videos", StaticFiles(directory="runtime/guide_videos"), name="guide_videos")
-    conf = StationManager().server_conf
+    os.makedirs(live_dir, exist_ok=True)
+    fapi.mount("/live", StaticFiles(directory=live_dir), name="live")
     uvicorn.run(fapi, host=conf["server_host"], port=conf["server_port"])
 
 
